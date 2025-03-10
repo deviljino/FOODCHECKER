@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>בודק המזרחים</title>
+    <meta name="description" content="אפליקציה לבדיקת מוצרים">
+    <link rel="manifest" href="#manifest" crossorigin="use-credentials">
+    <meta name="theme-color" content="#2196F3">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f5;
+            direction: rtl;
+        }
+        .header {
+            background-color: #2196F3;
+            color: white;
+            text-align: center;
+            padding: 15px;
+            position: fixed;
+            top: 0;
+            width: 100%;
+            z-index: 1000;
+        }
+        .container {
+            padding: 80px 20px 20px;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        .search-box {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        .result-item {
+            background-color: white;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .result-item h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        .result-item p {
+            margin: 5px 0;
+            color: #666;
+        }
+        .permitted {
+            color: #4CAF50;
+            font-weight: bold;
+        }
+        .forbidden {
+            color: #f44336;
+            font-weight: bold;
+        }
+        .loading {
+            text-align: center;
+            padding: 20px;
+        }
+        .footer {
+            text-align: center;
+            padding: 15px;
+            background-color: #f1f1f1;
+            margin-top: 20px;
+            font-size: 14px;
+            color: #666;
+        }
+        .status {
+            text-align: center;
+            padding: 10px;
+            margin-bottom: 15px;
+            background-color: #e0e0e0;
+            border-radius: 4px;
+        }
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #2196F3;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 2s linear infinite;
+            margin: 10px auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>בודק המזרחים</h1>
+    </div>
+    
+    <div class="container">
+        <div id="status" class="status">
+            <div class="loader"></div>
+            <div id="statusText">טוען מוצרים...</div>
+        </div>
+        
+        <input type="text" class="search-box" id="searchInput" placeholder="חפש מוצר לפי שם..." disabled>
+        
+        <div id="resultsContainer">
+            <div class="loading">אנא המתן בזמן טעינת המוצרים...</div>
+        </div>
+    </div>
+    
+    <div class="footer">
+        אפליקציית בודק המזרחים &copy; 2024
+    </div>
+
+    <script>
+        // רישום Service Worker לתמיכה ב-PWA
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js').then(registration => {
+                    console.log('ServiceWorker registered: ', registration);
+                }).catch(error => {
+                    console.log('ServiceWorker registration failed: ', error);
+                });
+            });
+        }
+
+        // יצירת manifest.json דינמי
+        const manifestContent = {
+            "name": "בודק המזרחים",
+            "short_name": "בודק",
+            "start_url": ".",
+            "display": "standalone",
+            "background_color": "#ffffff",
+            "theme_color": "#2196F3",
+            "icons": [{
+                "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAACXBIWXMAAAsSAAALEgHS3X78AAAD+0lEQVR4nO2bS2wbVRSGvzszThxn7Dhp0iYttE3SlDYIKBSEVAkQQmIDYgWbsquExKILWMAGsWHDCiQkQGIDrFhUXZSHhIrUqEiIRyXUS5s2aWins+nDie3YY3tcTO0k9njGj5k7Vf2vbM+95+r+n889c+65Y6iqyloGu9kOrPZ1TQAk242AmY3oAJoBIgLEVAGlVoSwM0VvbQ99fj8rKUUEZzMcKBsBb62OPd0D+Iwhpmxdq+1OQZTlXIJnK9Wh9AiYDNLl9fHu3p3UlcvZlMKRsyOETi3Q+XgjHYNNBYmg7AiYsLkOPnL3Lc6nFY7+dJZFSWbLiwHsHgfRixMcf+sw0fOT1N3tY+tjd5U8EmrK9cPjhMMWuxzseGEL9o0uJpNpYtEY649sJXBPI/GxBOdHzjI5Ol7y8ShbBISKqFgR2OhNsaejkZjg55d4G9MJmZT0x4JT3QDH9j5aBaqqkhGXCH0zRnzqAk2tG4p2tmQRcDRU+IRWAX61lT3NHoIJOxGpjo5X+9n+7IC2/+8Pj6SjJycY/+UCc2emSC8k8e9qIrC3meZQKx2P9BT1niULgekiohIv9dGRcnKx1s5gJMcZRTvffX0qNnZh4tr2zJlJHHVOHF4nWCzYPQ6aHtqE0+cq2teSBcCnRVS6JsWzQ/Vsa7Ryf7sbv6/+n6cTc0lGfxzTytvq3WwebufjPZ/R9dwWPM0ePO3raDrQXrSfJQuAQBE3QVmRCJ1KcvpKnLHLMQ4890DO8qlIglQ8lffazIUp5qI5EqJ5XNvk9TH8QBfD+7ugq7Cxi5ImQVVBzXPtf3mYkcQkweMXOfrOCZKJNFabJWdZi7WwabD1ti5CHjcAdPUG6TscyuscPCaEGPw0pB0fenpP3vOskqb5YDst9zYz+vNFxn49r52bujRDYiZJ1Qaf1v+d12/fIyyNVVCLHAU26wnSi0km/phbdm5xPklsLA5A49297HrjQOEXLwGllwQXkqx7aTu1wdrcdTJZRr85ryWwuoYa6gcasVf4ZliWylBRUl0RQk/1E3y8lyqPs1Rub0lZKkOXZ1fsUSaeCBOLz1Ptq+LHd08RHY7kvmhWobapjoa9LYw+NEJduy/v+WVcBlORhX/9K5NRppPTnDEfs0NaSFLj9yCnjbdbqkrszCTRXyJEfjvP1ONH89UpSwLMT8X/9z+zXmL2zBQzp8dZCMep6qmlZmcD6YU0qVgS1w4/DrdzxfrlzAHljwiVZCTBzIkxYidHUTMZXEE/3uF2qvva8ITasLrsFa1flvWAu4a1HgBrPgDWfACUNQkaaek3Q3caoVIX/WZfXN4xmK3yZ0FQ138bbTJi4/8gBEzWegCs+QC4DtEuuSoG4ovOAAAAAElFTkSuQmCC",
+                "sizes": "192x192",
+                "type": "image/png"
+            }]
+        };
+        
+        const manifestLink = document.querySelector('link[rel="manifest"]');
+        if (manifestLink) {
+            const manifestJson = JSON.stringify(manifestContent);
+            const manifestBlob = new Blob([manifestJson], {type: 'application/json'});
+            const manifestUrl = URL.createObjectURL(manifestBlob);
+            manifestLink.setAttribute('href', manifestUrl);
+        }
+
+        // Service Worker code generator
+        const swCode = `
+            self.addEventListener('install', function(event) {
+                event.waitUntil(
+                    caches.open('foodchecker-v1').then(function(cache) {
+                        return cache.addAll([
+                            '/',
+                            '/index.html'
+                        ]);
+                    })
+                );
+            });
+
+            self.addEventListener('fetch', function(event) {
+                event.respondWith(
+                    caches.match(event.request).then(function(response) {
+                        return response || fetch(event.request);
+                    })
+                );
+            });
+        `;
+
+        // יצירת קובץ Service Worker
+        const swBlob = new Blob([swCode], {type: 'application/javascript'});
+        const swUrl = URL.createObjectURL(swBlob);
+        
+        // הורדת קובץ Service Worker
+        const swLink = document.createElement('a');
+        swLink.style.display = 'none';
+        swLink.href = swUrl;
+        swLink.download = 'sw.js';
+        document.body.appendChild(swLink);
+        
+        // מערך לשמירת כל המוצרים מה-CSV
+        let allProducts = [];
+        let isDataLoaded = false;
+
+        // הגדרת ה-URL של קובץ ה-CSV בגיטהאב
+        const csvUrl = 'https://raw.githubusercontent.com/deviljino/FOODCHECKER/master/mitzrachim_final_hebrew.csv';
+        
+        // פונקציה לפירוק שורת CSV
+        function parseCSVLine(line) {
+            const values = [];
+            let currentValue = "";
+            let insideQuotes = false;
+            
+            for (let i = 0; i < line.length; i++) {
+                const char = line[i];
+                
+                if (char === '"') {
+                    insideQuotes = !insideQuotes;
+                } else if (char === ',' && !insideQuotes) {
+                    values.push(currentValue);
+                    currentValue = "";
+                } else {
+                    currentValue += char;
+                }
+            }
+            
+            values.push(currentValue); // הוספת הערך האחרון
+            return values;
+        }
+        
+        // טעינת קובץ ה-CSV מהגיטהאב
+        fetch(csvUrl)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('בעיה בטעינת הקובץ. סטטוס: ' + response.status);
+                }
+                return response.text();
+            })
+            .then(csvData => {
+                // פירוק הקובץ לשורות
+                const lines = csvData.split('\n');
+                
+                // הורדת שורת הכותרת (אם קיימת)
+                const headerLine = lines[0];
+                const headers = parseCSVLine(headerLine);
+                
+                // עיבוד כל שורה בקובץ
+                for (let i = 1; i < lines.length; i++) {
+                    if (lines[i].trim() === '') continue;
+                    
+                    const values = parseCSVLine(lines[i]);
+                    
+                    // יצירת אובייקט מוצר
+                    const product = {
+                        name: values[0] || 'שם חסר',
+                        company: values[1] || 'חברה לא ידועה',
+                        status: values[2] || '',
+                        details: values[3] || ''
+                    };
+                    
+                    // הוספת המוצר למערך
+                    allProducts.push(product);
+                }
+                
+                // שמירת המוצרים ב-localStorage לשימוש במצב לא מקוון
+                try {
+                    localStorage.setItem('foodcheckerProducts', JSON.stringify(allProducts));
+                } catch (e) {
+                    console.warn('לא ניתן לשמור את המוצרים ב-localStorage:', e);
+                }
+                
+                // עדכון סטטוס הטעינה
+                document.getElementById('statusText').textContent = `נטענו ${allProducts.length} מוצרים בהצלחה!`;
+                document.getElementById('status').style.backgroundColor = '#dff0d8';
+                document.querySelector('.loader').style.display = 'none';
+                
+                // הפעלת תיבת החיפוש
+                document.getElementById('searchInput').disabled = false;
+                document.getElementById('searchInput').placeholder = 'חפש מוצר לפי שם...';
+                document.getElementById('resultsContainer').innerHTML = '<div class="loading">הזן שם מוצר לחיפוש...</div>';
+                
+                isDataLoaded = true;
+            })
+            .catch(error => {
+                console.error('שגיאה בטעינת הקובץ:', error);
+                
+                // ניסיון לטעון מוצרים מה-localStorage במקרה של כישלון
+                try {
+                    const storedProducts = localStorage.getItem('foodcheckerProducts');
+                    if (storedProducts) {
+                        allProducts = JSON.parse(storedProducts);
+                        document.getElementById('statusText').textContent = `נטענו ${allProducts.length} מוצרים מהמטמון המקומי`;
+                        document.getElementById('status').style.backgroundColor = '#dff0d8';
+                        document.querySelector('.loader').style.display = 'none';
+                        document.getElementById('searchInput').disabled = false;
+                        document.getElementById('searchInput').placeholder = 'חפש מוצר לפי שם...';
+                        document.getElementById('resultsContainer').innerHTML = '<div class="loading">הזן שם מוצר לחיפוש...</div>';
+                        isDataLoaded = true;
+                        return;
+                    }
+                } catch (e) {
+                    console.error('שגיאה בטעינה מהמטמון המקומי:', e);
+                }
+                
+                document.getElementById('statusText').textContent = 'שגיאה בטעינת המוצרים. נסה שוב מאוחר יותר.';
+                document.getElementById('status').style.backgroundColor = '#f2dede';
+                document.querySelector('.loader').style.display = 'none';
+            });
+
+        // פונקציית חיפוש
+        function searchProducts(query) {
+            if (!query || !isDataLoaded) return [];
+            
+            query = query.trim().toLowerCase();
+            return allProducts.filter(product => 
+                (product.name && product.name.toLowerCase().includes(query)) || 
+                (product.company && product.company.toLowerCase().includes(query))
+            );
+        }
+
+        // הצגת תוצאות החיפוש
+        function displayResults(results) {
+            const container = document.getElementById('resultsContainer');
+            
+            if (results.length === 0) {
+                container.innerHTML = '<div class="loading">לא נמצאו תוצאות</div>';
+                return;
+            }
+            
+            let html = '';
+            results.forEach(product => {
+                html += `
+                    <div class="result-item">
+                        <h3>${product.name}</h3>
+                        <p>חברה: ${product.company}</p>
+                        <p>סטטוס: <span class="${product.status === 'כן' ? 'permitted' : 'forbidden'}">
+                            ${product.status}
+                        </span></p>
+                        ${product.details ? `<p>פרטים: ${product.details}</p>` : ''}
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+
+        // אירוע חיפוש
+        document.getElementById('searchInput').addEventListener('input', function(e) {
+            if (!isDataLoaded) return;
+            
+            const query = e.target.value;
+            const results = searchProducts(query);
+            
+            if (query.length > 0) {
+                displayResults(results);
+            } else {
+                document.getElementById('resultsContainer').innerHTML = 
+                    '<div class="loading">הזן שם מוצר לחיפוש...</div>';
+            }
+        });
+    </script>
+</body>
+</html> 
