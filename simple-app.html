@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>בודק המזרחים</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#4CAF50">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f5;
+            direction: rtl;
+        }
+        .header {
+            background-color: #4CAF50;
+            color: white;
+            text-align: center;
+            padding: 15px;
+            position: fixed;
+            top: 0;
+            width: 100%;
+            z-index: 1000;
+        }
+        .container {
+            padding: 80px 20px 20px;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        .search-box {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        .result-item {
+            background-color: white;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .result-item h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        .result-item p {
+            margin: 5px 0;
+            color: #666;
+        }
+        .kosher {
+            color: #4CAF50;
+            font-weight: bold;
+        }
+        .not-kosher {
+            color: #f44336;
+            font-weight: bold;
+        }
+        .loading {
+            text-align: center;
+            padding: 20px;
+        }
+        .footer {
+            text-align: center;
+            padding: 15px;
+            background-color: #f1f1f1;
+            margin-top: 20px;
+            font-size: 14px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>בודק המזרחים</h1>
+    </div>
+    
+    <div class="container">
+        <input type="text" class="search-box" id="searchInput" placeholder="חפש מוצר לפי שם...">
+        
+        <div id="resultsContainer">
+            <div class="loading">הזן שם מוצר לחיפוש...</div>
+        </div>
+    </div>
+    
+    <div class="footer">
+        אפליקציית בודק המזרחים &copy; 2024
+    </div>
+
+    <script>
+        // רישום Service Worker
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function() {
+                navigator.serviceWorker.register('sw.js').then(function(registration) {
+                    console.log('ServiceWorker registration successful');
+                }, function(err) {
+                    console.log('ServiceWorker registration failed: ', err);
+                });
+            });
+        }
+
+        // מידע לדוגמה - במציאות היינו טוענים זאת מקובץ ה-CSV
+        const sampleProducts = [
+            { name: "חלב תנובה 3%", kosher: true, kosherType: "בד״ץ העדה החרדית", company: "תנובה" },
+            { name: "שוקולד פרה", kosher: true, kosherType: "רבנות ראשית", company: "עלית" },
+            { name: "במבה", kosher: true, kosherType: "בד״ץ העדה החרדית", company: "אסם" },
+            { name: "קוקה קולה", kosher: true, kosherType: "OU", company: "קוקה קולה" },
+            { name: "חטיף שאינו כשר", kosher: false, kosherType: "", company: "חברה זרה" }
+        ];
+
+        // פונקציית חיפוש
+        function searchProducts(query) {
+            if (!query) return [];
+            
+            query = query.trim().toLowerCase();
+            return sampleProducts.filter(product => 
+                product.name.toLowerCase().includes(query) || 
+                product.company.toLowerCase().includes(query)
+            );
+        }
+
+        // הצגת תוצאות החיפוש
+        function displayResults(results) {
+            const container = document.getElementById('resultsContainer');
+            
+            if (results.length === 0) {
+                container.innerHTML = '<div class="loading">לא נמצאו תוצאות</div>';
+                return;
+            }
+            
+            let html = '';
+            results.forEach(product => {
+                html += `
+                    <div class="result-item">
+                        <h3>${product.name}</h3>
+                        <p>חברה: ${product.company}</p>
+                        <p>כשרות: <span class="${product.kosher ? 'kosher' : 'not-kosher'}">
+                            ${product.kosher ? product.kosherType : 'לא כשר'}
+                        </span></p>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+
+        // אירוע חיפוש
+        document.getElementById('searchInput').addEventListener('input', function(e) {
+            const query = e.target.value;
+            const results = searchProducts(query);
+            
+            if (query.length > 0) {
+                displayResults(results);
+            } else {
+                document.getElementById('resultsContainer').innerHTML = 
+                    '<div class="loading">הזן שם מוצר לחיפוש...</div>';
+            }
+        });
+    </script>
+</body>
+</html> 
